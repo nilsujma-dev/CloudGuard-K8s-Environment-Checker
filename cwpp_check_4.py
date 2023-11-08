@@ -119,7 +119,6 @@ if kubernetes_version_info:
 else:
     info.append(('Environment Compatibility', 'Kubernetes Version', 'Error retrieving version'))
 
-
 info.append(('Environment Compatibility', 'Helm Version', run_command('helm version --short')))
 kubernetes_distribution = detect_kubernetes_distribution()
 info.append(('Environment Compatibility', 'Kubernetes Distribution', kubernetes_distribution))
@@ -141,7 +140,7 @@ else:
 
 # Open Policy Agent (OPA) check
 opa_status = run_command('kubectl get deploy -n opa')
-info.append(('Open Policy Agent (OPA)', 'OPA status', 'in use' if opa_status else 'not in use'))
+info.append(('Open Policy Agent (OPA)', 'OPA status', 'in use' if opa_status else 'not configured'))
 opa_policies = run_command('kubectl get cm -n opa -l openpolicyagent.org/policy=rego')
 info.append(('Open Policy Agent (OPA)', 'OPA policies', opa_policies))
 

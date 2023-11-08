@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 
-# Function to execute a shell command and return the output.
+# Function to execute a shell command and return the output, including error message.
 def run_command(command):
     try:
         process = subprocess.run(
@@ -15,8 +15,7 @@ def run_command(command):
         )
         return process.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e.stderr}")
-        return None
+        return f"Error: {e.stderr}"
 
 def run_command_json(command):
     output = run_command(command)
@@ -79,13 +78,36 @@ def check_internet_access(namespace="default"):
 
     return success
 
+def detect_kubernetes_distribution():
+    # Check for cloud providers
+    node_labels = json.loads(run_command('kubectl get nodes -o json'))
+    for node in node_labels['items']:
+        labels = node['metadata']['labels']
+        if 'cloud.google.com/gke-nodepool' in labels:
+            return 'Google Kubernetes Engine (GKE)'
+        if 'kubernetes.azure.com/cluster' in labels:
+            return 'Azure Kubernetes Service (AKS)'
+        if 'eks.amazonaws.com/nodegroup' in labels:
+            return 'Amazon Elastic Kubernetes Service (EKS)'
+
+    # Check for OpenShift
+    openshift_version = run_command('oc version')
+    if openshift_version and 'openshift' in openshift_version.lower():
+        return 'Red Hat OpenShift'
+
+    # Fallback to checking for other identifying features if needed
+
+    # If none of the above checks work, return generic Kubernetes or an indication to check manually
+    return 'Generic Kubernetes / Unknown (Manual check required)'
+
 # Collecting the information
 info = []
 
 # Environment Compatibility
-info.append(('Environment Compatibility', 'Kubernetes Version', run_command('kubectl version --output=json')))
+info.append(('Environment Compatibility', 'Kubernetes Version', run_command_json('kubectl version --output=json')))
 info.append(('Environment Compatibility', 'Helm Version', run_command('helm version --short')))
-info.append(('Environment Compatibility', 'Kubernetes Distribution', "Manual check required"))
+kubernetes_distribution = detect_kubernetes_distribution()
+info.append(('Environment Compatibility', 'Kubernetes Distribution', kubernetes_distribution))
 info.append(('Environment Compatibility', 'Container Runtime', run_command("kubectl get nodes -o=jsonpath='{.items[*].status.nodeInfo.containerRuntimeVersion}'")))
 info.append(('Environment Compatibility', 'Node Operating System and Architecture', run_command("kubectl get nodes -o=jsonpath='{.items[*].status.nodeInfo.operatingSystem}/{.items[*].status.nodeInfo.architecture}'")))
 
@@ -93,7 +115,16 @@ info.append(('Environment Compatibility', 'Node Operating System and Architectur
 resource_quotas = run_command("kubectl describe quota --all-namespaces")
 info.append(('Resource Limits', 'Resource Quotas', resource_quotas))
 
-# Open Policy Agent (OPA)
+# Pod Security Policies (PSP) check
+psp_resources = run_command('kubectl api-resources | grep -w "podsecuritypolicies"')
+if "Error:" not in psp_resources:
+    psps_status = run_command('kubectl get psp')
+    info.append(('Pod Security Policies (PSP)', 'PSP status', 'configured' if psps_status else 'not configured'))
+    info.append(('Pod Security Policies (PSP)', 'PSPs in Place', psps_status if psps_status else 'None'))
+else:
+    info.append(('Pod Security Policies (PSP)', 'PSP status', 'not available in this cluster version'))
+
+# Open Policy Agent (OPA) check
 opa_status = run_command('kubectl get deploy -n opa')
 info.append(('Open Policy Agent (OPA)', 'OPA status', 'in use' if opa_status else 'not in use'))
 opa_policies = run_command('kubectl get cm -n opa -l openpolicyagent.org/policy=rego')
@@ -122,7 +153,7 @@ info.append(('Ingress/Egress', 'Egress restrictions or firewall rules', "Manual 
 # Third-party Integrations and Image Repositories
 # These would require knowledge of the specific cluster setup or applications in use.
 info.append(('Third-party Integrations', 'Tools or platforms integrated with the cluster', "Manual check required"))
-info.append(('Image Repositories to onboard', 'List all Image Repositories', "Manual check required"))
+info.append(('Image Repositories', 'List all Image Repositories', "Manual check required"))
 
 # Create DataFrame and save to Excel
 df = get_pandas_dataframe(info)

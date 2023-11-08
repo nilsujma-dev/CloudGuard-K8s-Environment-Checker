@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 
-# Function to execute a shell command and return the output.
+# Function to execute a shell command and return the output, including the error message.
 def run_command(command):
     try:
         process = subprocess.run(
@@ -15,8 +15,7 @@ def run_command(command):
         )
         return process.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e.stderr}")
-        return None
+        return f"Error: {e.stderr}"
 
 def run_command_json(command):
     output = run_command(command)
@@ -93,7 +92,16 @@ info.append(('Environment Compatibility', 'Node Operating System and Architectur
 resource_quotas = run_command("kubectl describe quota --all-namespaces")
 info.append(('Resource Limits', 'Resource Quotas', resource_quotas))
 
-# Open Policy Agent (OPA)
+# Pod Security Policies (PSP) check
+psp_resources = run_command('kubectl api-resources | grep -w "podsecuritypolicies"')
+if "Error:" not in psp_resources:
+    psps_status = run_command('kubectl get psp')
+    info.append(('Pod Security Policies (PSP)', 'PSP status', 'configured' if psps_status else 'not configured'))
+    info.append(('Pod Security Policies (PSP)', 'PSPs in Place', psps_status if psps_status else 'None'))
+else:
+    info.append(('Pod Security Policies (PSP)', 'PSP status', 'not available in this cluster version'))
+
+# Open Policy Agent (OPA) check
 opa_status = run_command('kubectl get deploy -n opa')
 info.append(('Open Policy Agent (OPA)', 'OPA status', 'in use' if opa_status else 'not in use'))
 opa_policies = run_command('kubectl get cm -n opa -l openpolicyagent.org/policy=rego')

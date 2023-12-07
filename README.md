@@ -1,6 +1,6 @@
 ## Kubernetes Cluster Environment and Internet Access Checker
 
-This GitHub repository contains a Python script for checking and documenting specific aspects of a Kubernetes cluster's environment and internet access capabilities. It provides a convenient way to verify the Kubernetes version and test pod internet access, with results documented in an Excel file.
+This GitHub repository contains a Python script for checking and documenting specific aspects of a Kubernetes cluster's environment and internet access capabilities. It provides a convenient way to verify the Kubernetes version and test pod internet access, with results documented in an Excel file. This is particular useful before doing a onboarding of a CWPP solution e.g. CloudGuard Workload Protection.
 
 ### Script Functionality
 1. **Kubernetes Version Check**: Retrieves the Kubernetes cluster's version information, including major, minor, and git versions.
